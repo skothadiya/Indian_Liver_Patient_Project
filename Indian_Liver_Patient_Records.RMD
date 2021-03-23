@@ -1,0 +1,431 @@
+---
+title: "Data Science CapStone Project - Indian Liver Patient Records"
+author: "Shweta Kothadiya"
+date: "3/20/2021"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Introduction/ Overview/Executive Summary:
+
+The name of the project that I have chosen is “Indian Liver Patient Records”. The dataset was downloaded from the UCI ML Repository (under kaggle website) Lichman, M. (2013). UCI Machine Learning Repository [http://archive.ics.uci.edu/ml]. Irvine, CA: University of California, School of Information and Computer Science.Patients with Liver disease have been continuously increasing because of excessive consumption of alcohol, inhale of harmful gases, intake of contaminated food, pickles and drugs. This dataset was used to evaluate prediction algorithms in an effort to reduce burden on doctors.
+
+**Goal of the Project:**
+The goal of this project is to calculate the highest accuracy by testing multiple models and to find out the possible variables that could have the highest impact on the liver disease using the results from the tested models. The key steps that would be performed during this project are - installing required packages/ libraries and loading the data, data analysis, data cleaning, data wrangling, then data visualization via plotting the data on maps. After this, data will be partitioned into train and test sets. Then I would be running few models against a variable / combination of variables to calculate the accuracy on each model. At the end, the results will be displayed to show the model that gives the highest accuracy followed by conclusion to summarize overall work and findings.
+
+## Method & Analysis Section:
+
+**Step 1 - Installing packages and Loading libraries:**
+
+```{r}
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+if(!require(rpart)) install.packages("rpart", repos = "http://cran.us.r-project.org")
+if(!require(randomForest)) install.packages("randomForest", repos = "http://cran.us.r-project.org")
+
+library(tidyverse)
+library(caret)
+library(data.table)
+library(ggplot2)
+library(rpart)
+library(randomForest)
+
+```
+
+For this project, "indian_liver_patient.csv" was downloaded from kaggle site to my machine. Function “read_csv” is used to import data into R as a dataframe. This same file can be found under this website -  https://www.kaggle.com/uciml/indian-liver-patient-records
+
+```{r}
+
+indianLiverPatient <- read.csv("C:\\Users\\Sanchit\\Documents\\Shweta\\edX\\Data Science Professional Certificate\\indian_liver_patient.csv", stringsAsFactors = FALSE)
+
+```
+
+**Step 2 - Data Analysis:**
+
+Let’s check the first 6 lines of "indianLiverPatient" dataset.
+
+```{r}
+
+head(indianLiverPatient)
+
+```
+
+Let’s analyze what are the dimensions of data frame and class of each column.
+
+```{r}
+
+dim(indianLiverPatient)
+class(indianLiverPatient)
+class(indianLiverPatient$Age)
+class(indianLiverPatient$Gender)
+class(indianLiverPatient$Total_Bilirubin)
+class(indianLiverPatient$Direct_Bilirubin)
+class(indianLiverPatient$Alkaline_Phosphotase)
+class(indianLiverPatient$Alamine_Aminotransferase)
+class(indianLiverPatient$Aspartate_Aminotransferase)
+class(indianLiverPatient$Total_Protiens)
+class(indianLiverPatient$Albumin)
+class(indianLiverPatient$Albumin_and_Globulin_Ratio)
+class(indianLiverPatient$Dataset)
+
+```
+
+Here is the count of records for each Gender in this data frame.
+
+```{r}
+
+indianLiverPatient %>% filter(Gender=="Male") %>% nrow()
+indianLiverPatient %>% filter(Gender=="Female") %>% nrow()
+
+```
+
+Let’s find out how many records are there for Patient with Liver disease and without liver disease.
+
+```{r}
+
+indianLiverPatient %>% filter(Dataset=="1") %>% nrow()
+indianLiverPatient %>% filter(Dataset=="2") %>% nrow()
+
+```
+
+Here is the summary of the data after the analysis was performed as above.
+
+This data set contains 416 liver patient records and 167 non liver patient records collected from North East of Andhra Pradesh, India. The "Dataset" column is a class label used to divide groups into liver patient (liver disease) or not (no disease). This data set contains 441 male patient records and 142 female patient records.Any patient whose age exceeded 89 is listed as being of age "90".
+Columns are as below:
+•	Age of the patient
+•	Gender of the patient
+•	Total Bilirubin
+•	Direct Bilirubin
+•	Alkaline Phosphatase
+•	Alanine Aminotransferase
+•	Aspartate Aminotransferase
+•	Total Proteins
+•	Albumin
+•	Albumin and Globulin Ratio
+•	Dataset: field used to split the data into two sets (patient with liver disease, or no disease)
+
+**Step 3 - Data Cleaning:**
+
+The dataset was checked for any NA values in any columns using the below code. I have found out that the column “Albumin_and_Globulin_Ratio” had NA values for 4 records. Those NA values were replaced with the average value for that column. Then the class of Gender column was set as factor and assigned values for Females and Males as 0 and 1 respectively.  
+
+```{r}
+
+indianLiverPatient[rowSums(is.na(indianLiverPatient))>0,]
+
+indianLiverPatient$Albumin_and_Globulin_Ratio=ifelse(is.na(indianLiverPatient$Albumin_and_Globulin_Ratio),ave(indianLiverPatient$Albumin_and_Globulin_Ratio,FUN = function(x)mean(x,na.rm = TRUE)),indianLiverPatient$Albumin_and_Globulin_Ratio)
+
+indianLiverPatient[rowSums(is.na(indianLiverPatient))>0,]
+
+```
+
+**Step 4 - Data Wrangling:**
+
+Here we are setting the “Dataset” and “Gender” columns as factor. Now “Female” will be shown as “0” and “Male” will be shown as “1”. The same way, the “Dataset” column was set as factor too. 
+
+```{r}
+
+ind_liv_patient_clean <- indianLiverPatient %>% 
+  mutate(Dataset = factor(indianLiverPatient$Dataset), 
+         	  Gender = factor(x=indianLiverPatient$Gender,levels = c('Female','Male'),labels=c(0,1))) %>% 
+  select(Age, Gender, Total_Bilirubin, Direct_Bilirubin, Alkaline_Phosphotase, Alamine_Aminotransferase, Aspartate_Aminotransferase, Total_Protiens, Albumin, Albumin_and_Globulin_Ratio, Dataset)
+
+```
+
+We can check the first 6 records of the cleaned data along with the "Gender" and "Dataset" columns which we had set them as "factor".
+
+```{r}
+
+head(ind_liv_patient_clean)
+class(ind_liv_patient_clean$Gender)
+class(ind_liv_patient_clean$Dataset)
+
+```
+
+**Step 5 - Data Visualization:**
+
+Let’s visualize the data using plots. 
+
+```{r}
+
+#Plot of Age vs. Gender 
+qplot(x=Age, y=Gender, data=ind_liv_patient_clean, geom="point")
+
+#Plot of Age vs. Dataset, grouped by Gender and colored by Gender. 
+ind_liv_patient_clean %>% group_by(Gender) %>% ggplot(aes(x=Age, y =Dataset, color=Gender)) + geom_point()
+
+#BoxPlot of Dataset vs. Age,grouped by Gender and colored by Gender. 
+ind_liv_patient_clean %>% group_by(Gender) %>% ggplot(aes(x=Dataset, y =Age, color=Gender)) + geom_boxplot()
+
+#Boxplot of Dataset vs. Total Bilirubin and grouped and colored by Gender
+ind_liv_patient_clean %>% group_by(Gender) %>% ggplot(aes(x=Dataset, y =Total_Bilirubin, color=Gender)) + geom_boxplot()
+
+#ggplot of Age vs. Total Bilirubin and colored by Gender
+ind_liv_patient_clean %>% ggplot(aes(Age,Total_Bilirubin, color=Gender)) + geom_point()
+
+#ggplot of Gender and Total Bilirubin colored by Gender
+ind_liv_patient_clean %>% ggplot(aes(Gender,Total_Bilirubin, color=Gender)) + geom_point()
+
+#ggplot of Dataset and Alkaline Phosphotase colored by Gender
+ind_liv_patient_clean %>% ggplot(aes(x=Dataset, y=Alkaline_Phosphotase, color=Gender)) + geom_point()
+
+#Boxplot of Dataset vs. Alkaline Phosphotase grouped and colored by Gender
+ind_liv_patient_clean %>% group_by(Gender) %>% ggplot(aes(x=Dataset, y =Alkaline_Phosphotase, color=Gender)) + geom_boxplot()
+
+```
+
+**Step 6 - Data Partitioning:**
+
+After the data visualization, let’s start working towards splitting the data into train and test sets so we can start training the models to calculate the accuracy.
+
+First I will set the seed to 1 with “sample.kind as Rounding” as I am using R version 4.0.3. Then I will create partition and will send 20 percent data into test set and rest 80 percent under training. Then we will check the dimentions of test_set and train_set. 
+
+```{r}
+
+set.seed(1, sample.kind = "Rounding")
+test_index <- createDataPartition(ind_liv_patient_clean$Dataset, times = 1, p = 0.2, list = FALSE)
+test_set <- ind_liv_patient_clean[test_index,]
+train_set <- ind_liv_patient_clean[-test_index,]
+
+dim(test_set)
+dim(train_set)
+
+```
+
+**Step 7 - Models and analysis to calculate the accuracy:**
+
+The models that I have used in this project to predict the disease and to calculate the accuracy are Linear Discriminant Analysis (LDA), Quadratic Discriminant Analysis (QDA),  Generalized Linear Model (GLM), Classification tree, and Random Forest model.
+
+1. Training LDA (Linear Discriminant Analysis) model on train_set to check if liver disease is affected by Total Bilirubin. Then I will be using the train_lda model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_lda <- train(Dataset ~ Total_Bilirubin, method = "lda", data = train_set)
+lda_preds <- predict(train_lda, test_set)
+mean(lda_preds == test_set$Dataset)
+
+```
+
+2. Training QDA (Quadratic Discriminant Analysis) model on train_set to check if liver disease is affected by Total Bilirubin. Then I will be using the train_qda model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_qda <- train(Dataset ~ Total_Bilirubin, method = "qda", data = train_set)
+qda_preds <- predict(train_qda, test_set)
+mean(qda_preds == test_set$Dataset)
+
+```
+
+3. Training LDA (Linear Discriminant Analysis) model on train_set to check if liver disease is affected by Total Bilirubin & Age combined. Then I will be using the train_lda_TB_Age model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_lda_TB_Age <- train(Dataset ~ Total_Bilirubin + Age, method = "lda", data = train_set)
+lda_preds_TB_Age <- predict(train_lda_TB_Age, test_set)
+mean(lda_preds_TB_Age == test_set$Dataset)
+
+```
+
+4. Training QDA (Quadratic Discriminant Analysis) model on train_set to check if liver disease is affected by Total Bilirubin & Age combined. Then I will be using the train_qda_TB_Age model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_qda_TB_Age <- train(Dataset ~ Total_Bilirubin + Age, method = "qda", data = train_set)
+qda_preds_TB_Age <- predict(train_qda_TB_Age, test_set)
+mean(qda_preds_TB_Age == test_set$Dataset)
+
+```
+
+5. Training LDA (Linear Discriminant Analysis) model on train_set to check if liver disease is affected by Total Bilirubin & Gender combined. Then I will be using the train_lda_TB_gender model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_lda_TB_gender <- train(Dataset ~ Total_Bilirubin + Gender, method = "lda", data = train_set)
+lda_preds_TB_gender <- predict(train_lda_TB_gender, test_set)
+mean(lda_preds_TB_gender == test_set$Dataset)
+
+```
+
+6. Training QDA (Quadratic Discriminant Analysis) model on train_set to check if liver disease is affected by Total Bilirubin & Gender combined. Then I will be using the train_qda_TB_gender model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_qda_TB_gender <- train(Dataset ~ Total_Bilirubin + Gender, method = "qda", data = train_set)
+qda_preds_TB_gender <- predict(train_qda_TB_gender, test_set)
+mean(qda_preds_TB_gender == test_set$Dataset)
+
+```
+
+7. Training LDA (Linear Discriminant Analysis) model on train_set to check if liver disease is affected by Age & Gender combined. Then I will be using the train_lda_Age_gender model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_lda_Age_gender <- train(Dataset ~ Age + Gender, method = "lda", data = train_set)
+lda_preds_Age_gender <- predict(train_lda_Age_gender, test_set)
+mean(lda_preds_Age_gender == test_set$Dataset)
+
+```
+
+8. Training QDA (Quadratic Discriminant Analysis) model on train_set to check if liver disease is affected by Age & Gender combined. Then I will be using the train_qda_Age_gender model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+```{r}
+
+train_qda_Age_gender <- train(Dataset ~ Age + Gender, method = "qda", data = train_set)
+qda_preds_Age_gender <- predict(train_qda_Age_gender, test_set)
+mean(qda_preds_Age_gender == test_set$Dataset)
+
+```
+
+9. Training LDA (Linear Discriminant Analysis) model on train_set to check if liver disease is affected by Age. Then I will be using the train_lda_age model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_lda_age <- train(Dataset ~ Age, method = "lda", data = train_set)
+lda_preds_age <- predict(train_lda_age, test_set)
+mean(lda_preds_age == test_set$Dataset)
+
+```
+
+10. Training QDA (Quadratic Discriminant Analysis) model on train_set to check if liver disease is affected by Age. Then I will be using the train_qda_age model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_qda_age <- train(Dataset ~ Age, method = "qda", data = train_set)
+qda_preds_age <- predict(train_qda_age, test_set)
+mean(qda_preds_age == test_set$Dataset)
+
+```
+
+11. Training GLM (Generalized Linear Model) model on train_set to check if liver disease is affected by Age. Then I will be using the train_glm_age model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_glm_age <- train(Dataset ~ Age, method = "glm", data = train_set)
+glm_preds_age <- predict(train_glm_age, test_set)
+mean(glm_preds_age == test_set$Dataset)
+
+```
+
+12. Training GLM (Generalized Linear Model) model on train_set to check if liver disease is affected by Age, Gender, Direct Bilirubin combined. Then I will be using the train_glm_age_gender_db model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_glm_age_gender_db <- train(Dataset ~ Age + Gender + Direct_Bilirubin, method = "glm", data = train_set)
+glm_preds_age_gender_db <- predict(train_glm_age_gender_db, test_set)
+mean(glm_preds_age_gender_db == test_set$Dataset)
+
+```
+
+13. Training GLM (Generalized Linear Model) model on train_set to check if liver disease is affected by all predictors combined. Then I will be using the train_glm_all model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_glm_all <- train(Dataset ~ ., method = "glm", data = train_set)
+glm_preds_all <- predict(train_glm_all, test_set)
+mean(glm_preds_all == test_set$Dataset)
+
+```
+
+14. Training LDA (Linear Discriminant Analysis) model on train_set to check if liver disease is affected by Alkaline_Phosphotase. Then I will be using the train_lda_AlkPho model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_lda_AlkPho <- train(Dataset ~ Alkaline_Phosphotase, method = "lda", data = train_set) 
+lda_preds_AlkPho <- predict(train_lda_AlkPho, test_set)
+mean(lda_preds_AlkPho == test_set$Dataset)
+
+```
+
+15. Training QDA (Quadratic Discriminant Analysis) model on train_set to check if liver disease is affected by Alkaline_Phosphotase. Then I will be using the train_qda_AlkPho model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_qda_AlkPho <- train(Dataset ~ Alkaline_Phosphotase, method = "qda", data = train_set)
+qda_preds_AlkPho <- predict(train_qda_AlkPho, test_set)
+mean(qda_preds_AlkPho == test_set$Dataset)
+
+```
+
+16. Training GLM (Generalized Linear Model) model on train_set to check if liver disease is affected by Alkaline_Phosphotase. Then I will be using the train_glm_AlkPho model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function.
+
+```{r}
+
+train_glm_AlkPho <- train(Dataset ~ Alkaline_Phosphotase, method = "glm", data = train_set)
+glm_preds_AlkPho <- predict(train_glm_AlkPho, test_set)
+mean(glm_preds_AlkPho == test_set$Dataset)
+
+```
+
+17. Training Classification Tree model on train_set to check if liver disease is affected by all the predictors combined. Then I will be using the train_rpart model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function. After this we can find what is the best tune and final model that this “rpart” method gives us.
+
+```{r}
+
+train_rpart <- train(Dataset ~ ., method = "rpart", tuneGrid = data.frame(cp = seq(0, 0.05, 0.002)), data = train_set)
+plot(train_rpart)
+rpart_preds <- predict(train_rpart, test_set)
+mean(rpart_preds == test_set$Dataset)
+
+train_rpart$bestTune
+train_rpart$finalModel
+train_rpart
+
+```
+
+18. Training RF (Random Forest Model) model on train_set to check if liver disease is affected by all the predictors combined. Then I will be using the train_rf model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function. Then we can plot the model. After that we can use “varimp” function (Variable Importance) to find the most important variable from this model. 
+
+```{r}
+
+train_rf <- train(Dataset ~ ., data = train_set, method = "rf", ntree = 100, tuneGrid = data.frame(mtry = seq(1:7)))
+rf_preds <- predict(train_rf, test_set)
+mean(rf_preds == test_set$Dataset)
+
+ggplot(train_rf)
+plot(train_rf)
+
+varImp(train_rf)
+
+```
+
+19. Random Forest model with nodesize as 50 and maxnodes as 25. Then we can plot train_rf_n model. Then we can use the train_rf_n model against test_set. Then the accuracy will be checked between model's prediction and actual data in test_set using mean function. After that we can use “varimp” function (Variable Importance) to find the most important variable from this model. 
+
+```{r}
+
+train_rf_n <- train(Dataset ~ ., data = train_set, method = "rf", nodesize = 50, maxnodes = 25)
+plot(train_rf_n)
+rf_preds_n <- predict(train_rf_n, test_set)
+mean(rf_preds_n == test_set$Dataset)
+
+varImp(train_rf_n)
+
+```
+
+## Results:
+
+Model# 18 “Random Forest Model “is giving the best and highest accuracy among all the models that we have tested so far. The accuracy that we received using this model is 0.7372881 for the first time and 0.7288136 for the 2nd time. The code of this model is as below. 
+
+Comments on the code: Training RF (Random Forest Model) model on train_set to check if liver disease is affected by all the predictors combined. Then we used the train_rf model against test_set. Then the accuracy was checked between model’s prediction and actual data in test_set using mean function. The plot on this model has been shown and the variable importance has been displayed here as well to find the most important variable from this model. As per the results, the most important variable that affects the liver disease was “Alamine_Aminotransferase” followed by “Alkaline_Phosphotase”.
+
+```{r}
+
+train_rf <- train(Dataset ~ ., data = train_set, method = "rf", ntree = 100, tuneGrid = data.frame(mtry = seq(1:7)))
+rf_preds <- predict(train_rf, test_set)
+mean(rf_preds == test_set$Dataset)
+
+ggplot(train_rf)
+plot(train_rf)
+
+```
+
+## Conclusion:
+
+The best model that gave the highest accuracy was “train_rf” using the “Random Forest method”. We got the accuracy as 0.7372881 for the first time and 0.7288136 for the 2nd time. This model was tested against all the variables. According to this “Random Forest model”, the most important variable that causes the liver disease is “Alamine_Aminotransferase“ followed by “Alkaline_Phosphotase“, “Aspartate_Aminotransferase“, “Age”, and “Total_Bilirubin“ in the respective order. 
+
+After this “Random Forest model”, there were 3 other models that gave the 2nd highest accuracy which is 0.720339. Those models are - model# 9 “train_lda_age “ with the use of “Linear Discriminant Analysis” method, model# 11 “train_glm_age “ with the use of “Generalized Linear Method“ and model# 13 “train_glm_all “ with the use of “Generalized Linear Method“. Out of these three models, two models were tested against only one variable and that was “Age”.  So to some extent, “Age” factor also is a big contributor that causes the liver disease. According to our “Random Forest model”, Age variable came as number 4 in the rank that can cause the liver disease. 
+
+Another thing that I noticed was if we to compare “Linear Discriminant Analysis” (LDA) and “Quadratic Discriminant Analysis” (QDA) models in general, then “Linear Discriminant Analysis” (LDA) model seemed better than using “Quadratic Discriminant Analysis” (QDA) model. The reason being LDA gave the higher accuracy that we were looking for when it was tested against multiple different variables like Total Bilirubin, Age, Gender, and combinations of these variables.
+
+Overall I would recommend using “Random Forest” model. This model would be beneficial to predict the contributing factors in the order of importance that affect the liver disease. The data from this model can be used by medical professionals to identify the patients that could be at high risk of having a liver disease in order to monitor on the regular basis.
+
+
